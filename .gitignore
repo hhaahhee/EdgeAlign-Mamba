@@ -1,0 +1,59 @@
+# Python cache and local environments
+__pycache__/
+*.py[cod]
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+.env
+.env.*
+
+# IDE and operating-system files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Training outputs and logs
+results/
+runs/
+logs/
+wandb/
+*.log
+events.out.tfevents.*
+
+# Model weights and profiling artifacts
+checkpoints/
+pre_trained/
+pre_trained_weights/
+*.ckpt
+*.pth
+*.pt
+*.onnx
+*.npy
+*.npz
+*.h5
+*.pkl
+*.pem
+*.key
+
+# Local datasets and generated manifests
+data/isic2018/
+data/ph2/
+data/**/raw/
+*_manifest.csv
+
+# Generated predictions and temporary files
+outputs/
+predictions/
+*.tmp
+*.bak
+
+# Manuscripts and local analysis tables are maintained outside the code repository
+README_CN.md
+*.docx
+*.pdf
+*.xlsx
