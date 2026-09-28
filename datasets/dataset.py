@@ -21,10 +21,19 @@ def _files_by_stem(folder: Path):
 class NPY_datasets(Dataset):
     """Paired RGB image and binary-mask dataset used by ISIC2018 and PH2."""
 
-    def __init__(self, path_Data, config, train=True, split=None, return_id=False):
+    def __init__(
+        self,
+        path_Data,
+        config,
+        train=True,
+        split=None,
+        return_id=False,
+        return_mask_path=False,
+    ):
         super().__init__()
         self.split = split or ("train" if train else "val")
         self.return_id = return_id
+        self.return_mask_path = return_mask_path
         root = Path(path_Data) / self.split
         image_dir = root / "images"
         mask_dir = root / "masks"
@@ -53,8 +62,12 @@ class NPY_datasets(Dataset):
         image = np.asarray(Image.open(image_path).convert("RGB"))
         mask = np.expand_dims(np.asarray(Image.open(mask_path).convert("L")), axis=2) / 255.0
         image, mask = self.transformer((image, mask))
+        if self.return_id and self.return_mask_path:
+            return image, mask, self.sample_ids[index], str(mask_path)
         if self.return_id:
             return image, mask, self.sample_ids[index]
+        if self.return_mask_path:
+            return image, mask, str(mask_path)
         return image, mask
 
     def __len__(self):

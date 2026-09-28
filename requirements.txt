@@ -17,6 +17,7 @@ tqdm==4.64.1
 
 # Data / IO
 numpy==1.26.4
+scipy==1.11.4
 Pillow==10.3.0
 
 # Visualization

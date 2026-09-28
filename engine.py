@@ -47,12 +47,14 @@ def train_one_epoch(train_loader,
     model.train() 
  
     loss_list = []
+    device = next(model.parameters()).device
 
     for iter, data in enumerate(train_loader):
-        step += iter
+        step += 1
         optimizer.zero_grad()
         images, targets = data
-        images, targets = images.cuda(non_blocking=True).float(), targets.cuda(non_blocking=True).float()
+        images = images.to(device, non_blocking=True).float()
+        targets = targets.to(device, non_blocking=True).float()
 
         out = model(images)
         loss = criterion(out, targets)
@@ -64,7 +66,7 @@ def train_one_epoch(train_loader,
 
         now_lr = optimizer.state_dict()['param_groups'][0]['lr']
 
-        writer.add_scalar('loss', loss, global_step=step)
+        writer.add_scalar('loss', loss.item(), global_step=step)
 
         if iter % config.print_interval == 0:
             log_info = f'train: epoch {epoch}, iter:{iter}, loss: {np.mean(loss_list):.4f}, lr: {now_lr}'
@@ -85,10 +87,12 @@ def val_one_epoch(test_loader,
     preds = []
     gts = []
     loss_list = []
+    device = next(model.parameters()).device
     with torch.no_grad():
         for data in tqdm(test_loader):
             img, msk = data
-            img, msk = img.cuda(non_blocking=True).float(), msk.cuda(non_blocking=True).float()
+            img = img.to(device, non_blocking=True).float()
+            msk = msk.to(device, non_blocking=True).float()
 
             out = model(img)
             loss = criterion(out, msk)
@@ -133,10 +137,12 @@ def test_one_epoch(test_loader,
     preds = []
     gts = []
     loss_list = []
+    device = next(model.parameters()).device
     with torch.no_grad():
         for i, data in enumerate(tqdm(test_loader)):
             img, msk = data
-            img, msk = img.cuda(non_blocking=True).float(), msk.cuda(non_blocking=True).float()
+            img = img.to(device, non_blocking=True).float()
+            msk = msk.to(device, non_blocking=True).float()
 
             out = model(img)
             loss = criterion(out, msk)

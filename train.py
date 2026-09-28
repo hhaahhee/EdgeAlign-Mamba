@@ -6,20 +6,15 @@ from models.edgealign_mamba import EdgeAlignMamba
 
 from engine import *
 import os
-import sys
 
 from utils import *
 from configs.config_setting import setting_config
-
-import warnings
-warnings.filterwarnings("ignore")
 
 
 
 def main(config):
 
     print('#----------Creating logger----------#')
-    sys.path.append(config.work_dir + '/')
     log_dir = os.path.join(config.work_dir, 'log')
     checkpoint_dir = os.path.join(config.work_dir, 'checkpoints')
     resume_model = os.path.join(checkpoint_dir, 'latest.pth')
@@ -29,10 +24,8 @@ def main(config):
     if not os.path.exists(outputs):
         os.makedirs(outputs)
 
-    global logger
     logger = get_logger('train', log_dir)
-    global writer
-    writer = SummaryWriter(config.work_dir + 'summary')
+    writer = SummaryWriter(os.path.join(config.work_dir, 'summary'))
 
     log_config_info(config, logger)
 
@@ -42,6 +35,9 @@ def main(config):
 
     print('#----------GPU init----------#')
     os.environ["CUDA_VISIBLE_DEVICES"] = config.gpu_id
+    if not torch.cuda.is_available():
+        raise RuntimeError('Training requires a CUDA-enabled PyTorch installation and NVIDIA GPU')
+    device = torch.device('cuda')
     set_seed(config.seed)
     torch.cuda.empty_cache()
 
@@ -96,8 +92,9 @@ def main(config):
         )
         model.load_from()
         
-    else: raise Exception('network in not right!')
-    model = model.cuda()
+    else:
+        raise ValueError(f'Unsupported network: {config.network}')
+    model = model.to(device)
 
     cal_params_flops(model, 256, logger)
 
@@ -181,7 +178,8 @@ def main(config):
 
     if os.path.exists(os.path.join(checkpoint_dir, 'best.pth')):
         print('#----------Best-checkpoint validation evaluation----------#')
-        best_weight = torch.load(config.work_dir + 'checkpoints/best.pth', map_location=torch.device('cpu'))
+        best_path = os.path.join(checkpoint_dir, 'best.pth')
+        best_weight = torch.load(best_path, map_location=torch.device('cpu'))
         model.load_state_dict(best_weight)
         loss = test_one_epoch(
                 val_loader,
@@ -190,10 +188,8 @@ def main(config):
                 logger,
                 config,
             )
-        os.rename(
-            os.path.join(checkpoint_dir, 'best.pth'),
-            os.path.join(checkpoint_dir, f'best-epoch{min_epoch}-loss{min_loss:.4f}.pth')
-        )      
+        os.replace(best_path, os.path.join(checkpoint_dir, f'best-epoch{min_epoch}-loss{min_loss:.4f}.pth'))
+    writer.close()
 
 
 if __name__ == '__main__':

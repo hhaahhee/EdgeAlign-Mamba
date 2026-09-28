@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.backends.cudnn as cudnn
 import torchvision.transforms.functional as TF
+from torchvision.transforms import InterpolationMode
 import numpy as np
 import os
 import math
@@ -19,8 +20,9 @@ def set_seed(seed):
     np.random.seed(seed)
     # for cpu gpu
     torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
     # for cudnn
     cudnn.benchmark = False
     cudnn.deterministic = True
@@ -399,7 +401,16 @@ class myResize:
         self.size_w = size_w
     def __call__(self, data):
         image, mask = data
-        return TF.resize(image, [self.size_h, self.size_w]), TF.resize(mask, [self.size_h, self.size_w])
+        size = [self.size_h, self.size_w]
+        image = TF.resize(
+            image,
+            size,
+            interpolation=InterpolationMode.BILINEAR,
+            antialias=True,
+        )
+        mask = TF.resize(mask, size, interpolation=InterpolationMode.NEAREST)
+        mask = (mask >= 0.5).to(mask.dtype)
+        return image, mask
        
 
 class myRandomHorizontalFlip:
@@ -422,38 +433,41 @@ class myRandomVerticalFlip:
 
 class myRandomRotation:
     def __init__(self, p=0.5, degree=[0,360]):
-        self.angle = random.uniform(degree[0], degree[1])
+        self.degree = degree
         self.p = p
     def __call__(self, data):
         image, mask = data
-        if random.random() < self.p: return TF.rotate(image,self.angle), TF.rotate(mask,self.angle)
-        else: return image, mask 
+        if random.random() < self.p:
+            angle = random.uniform(self.degree[0], self.degree[1])
+            image = TF.rotate(image, angle, interpolation=InterpolationMode.BILINEAR)
+            mask = TF.rotate(mask, angle, interpolation=InterpolationMode.NEAREST)
+            return image, (mask >= 0.5).to(mask.dtype)
+        return image, mask
 
 
 class myNormalize:
     def __init__(self, data_name, train=True):
-        if data_name == 'isic18':
-            if train:
-                self.mean = 157.561
-                self.std = 26.706
-            else:
-                self.mean = 149.034
-                self.std = 32.022
-        else:
+        # ``train`` is retained for compatibility with the existing config.
+        if data_name != 'isic18':
             raise ValueError(f'Unsupported normalization profile: {data_name}')
             
     def __call__(self, data):
         img, msk = data
-        img_normalized = (img-self.mean)/self.std
-        img_normalized = ((img_normalized - np.min(img_normalized)) 
-                            / (np.max(img_normalized)-np.min(img_normalized))) * 255.
+        img = np.asarray(img, dtype=np.float64)
+        img_min = np.min(img)
+        img_max = np.max(img)
+        if img_max <= img_min:
+            img_normalized = np.zeros_like(img, dtype=np.float64)
+        else:
+            img_normalized = ((img - img_min) / (img_max - img_min)) * 255.
         return img_normalized, msk
     
 
 
 from thop import profile		 ## 导入thop模块
 def cal_params_flops(model, size, logger):
-    input = torch.randn(1, 3, size, size).cuda()
+    device = next(model.parameters()).device
+    input = torch.randn(1, 3, size, size, device=device)
     flops, params = profile(model, inputs=(input,))
     print('flops',flops/1e9)			## 打印计算量
     print('params',params/1e6)			## 打印参数量
